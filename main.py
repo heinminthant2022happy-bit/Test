@@ -1,63 +1,92 @@
-import sys
-import time
-import os
+import sys, time, os, requests, hashlib, base64
+from datetime import datetime
 
-# ၁။ engine.so ဖိုင်ရှိမရှိ စစ်ဆေးခြင်း
+# ၁။ engine.so စစ်ဆေးခြင်း
 try:
     import engine
 except ImportError:
-    print("\033[0;31m[!] Error: engine.so ဖိုင်ကို မတွေ့ပါ။\033[00m")
+    print("\033[0;31m[!] Error: engine.so missing.\033[00m")
     sys.exit(1)
 
-# ၂။ သင်ကိုယ်တိုင် သတ်မှတ်ပေးမယ့် Access Keys များ
-# ဒီနေရာမှာ သင်ပေးချင်တဲ့ Key တွေကို စာရင်းသွင်းထားပါ
-ALLOWED_KEYS = ["ALADDIN-VIP-01", "HAPPY-BIT-99", "TEST-KEY"]
+# Configuration (သင့်ရဲ့ GitHub Raw Link ကို ပြင်ရန်)
+DB_URL = "https://raw.githubusercontent.com/heinminthant2022happy-bit/Test/refs/heads/main/database.txt"
+LOCAL_DB = ".sys_auth.bin"
 
-def check_license():
-    os.system('clear' if os.name == 'posix' else 'cls')
-    print("\033[0;36m" + "="*45)
-    print("   🚀 Aladdin Starlink Bypass - Admin Panel 🚀")
-    print("="*45 + "\033[00m")
-    
-    # ဖုန်းရဲ့ Device ID ကို ထုတ်ပြခြင်း (User ဆီက Key တောင်းဖို့အတွက်)
+def get_device_id():
+    # Android ID ကို အခြေခံပြီး TRB- စတိုင် Unique ID ထုတ်ခြင်း
+    import subprocess
+    cmd = "settings get secure android_id"
+    aid = subprocess.check_output(cmd, shell=True).decode().strip()
+    unique_id = "TRB-" + hashlib.md34(aid.encode()).hexdigest()[:12].upper()
+    return unique_id
+
+def encrypt_data(data):
+    return base64.b64encode(data.encode()).decode()
+
+def decrypt_data(data):
+    try: return base64.b64decode(data.encode()).decode()
+    except: return ""
+
+def check_online():
     try:
-        device_id = engine.get_system_key()
-        print(f"\033[0;32m[*] Your Device ID: {device_id}\033[00m")
+        r = requests.get(DB_URL, timeout=5)
+        return r.text.splitlines() if r.status_code == 200 else None
     except:
-        pass
+        return None
 
-    print("-" * 45)
-    user_key = input("\033[0;33m[?] Enter Access Key: \033[00m").strip()
+def main_auth():
+    os.system('clear')
+    my_id = get_device_id()
+    print(f"\033[0;36mDevice ID: {my_id}\033[00m")
     
-    if user_key in ALLOWED_KEYS:
-        print("\033[0;32m[+] Access Granted! Welcome.\033[00m")
-        time.sleep(1.5)
-        return True
-    else:
-        print("\033[0;31m[!] Invalid Key! ဆက်သွယ်ရန် - @Aladdin_Help_Bot\033[00m")
-        time.sleep(2)
+    db_data = check_online()
+    
+    # Offline Check (ဖုန်းထဲက ဖိုင်ကိုစစ်ခြင်း)
+    if os.path.exists(LOCAL_DB):
+        with open(LOCAL_DB, "r") as f:
+            saved = decrypt_data(f.read()).split("|")
+            if len(saved) == 3:
+                s_id, s_key, s_date = saved
+                expire_dt = datetime.strptime(s_date, "%Y-%m-%d")
+                
+                # အကယ်၍ Online ရရင် GitHub နဲ့ တိုက်စစ်မယ်
+                if db_data:
+                    found = False
+                    for line in db_data:
+                        if f"{my_id}|{s_key}|{s_date}" == line:
+                            found = True; break
+                    if not found:
+                        os.remove(LOCAL_DB)
+                        print("\033[0;31m[!] Key Revoked or Changed by Admin.\033[00m")
+                        time.sleep(2); return False
+
+                # သက်တမ်းစစ်ခြင်း
+                if expire_dt > datetime.now():
+                    print(f"\033[0;32m[+] Welcome Back! Expire: {s_date}\033[00m")
+                    return True
+                else:
+                    print("\033[0;31m[!] Key Expired.\033[00m")
+                    os.remove(LOCAL_DB)
+
+    # Key အသစ်တောင်းခြင်း
+    if not db_data:
+        print("\033[0;31m[!] No Internet Connection for First Login.\033[00m")
         return False
 
-def main():
-    try:
-        # သင်ကိုယ်တိုင်လုပ်ထားတဲ့ License Check အရင်အောင်မြင်ရမယ်
-        if check_license():
-            # အောင်မြင်မှ .so ထဲက မူရင်း logic ကို run မယ်
-            engine.run_script()
-        else:
-            sys.exit(0)
-            
-    except KeyboardInterrupt:
-        print("\n\033[0;31m[!] Program ကို အသုံးပြုသူမှ ရပ်ဆိုင်းလိုက်ပါသည်။\033[00m")
-        sys.exit(0)
-        
-    except Exception as e:
-        # Error တက်ရင် ၁၀ စက္ကန့်နေရင် ပြန်စတင်မယ်
-        print(f"\n\033[0;31m[!] Error: {e}\033[00m")
-        print("\033[0;33m[*] ၁၀ စက္ကန့်အကြာတွင် အလိုအလျောက် ပြန်လည်စတင်ပါမည်...\033[00m")
-        time.sleep(10)
-        main()
+    u_key = input("\033[0;33mEnter Key: \033[00m").strip()
+    for line in db_data:
+        parts = line.split("|")
+        if len(parts) == 3 and parts[0] == my_id and parts[1] == u_key:
+            if datetime.strptime(parts[2], "%Y-%m-%d") > datetime.now():
+                with open(LOCAL_DB, "w") as f:
+                    f.write(encrypt_data(line))
+                print("\033[0;32m[+] Login Successful!\033[00m")
+                return True
+    
+    print("\033[0;31m[!] Invalid Key or Device ID.\033[00m")
+    return False
 
 if __name__ == "__main__":
-    main()
-  
+    if main_auth():
+        engine.run_script()
+        
