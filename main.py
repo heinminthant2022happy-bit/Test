@@ -13,12 +13,18 @@ DB_URL = "https://raw.githubusercontent.com/heinminthant2022happy-bit/Test/refs/
 LOCAL_DB = ".sys_auth.bin"
 
 def get_device_id():
-    # Android ID ကို အခြေခံပြီး TRB- စတိုင် Unique ID ထုတ်ခြင်း
-    import subprocess
-    cmd = "settings get secure android_id"
-    aid = subprocess.check_output(cmd, shell=True).decode().strip()
-    unique_id = "TRB-" + hashlib.md34(aid.encode()).hexdigest()[:12].upper()
+    # Android ID တောင်းရခက်ရင် ဖုန်းရဲ့ ပိုင်ရှင်အမည် သို့မဟုတ် hardware info နဲ့ အစားထိုးခြင်း
+    try:
+        # ပထမနည်းလမ်း- android_id ကို လှမ်းတောင်းမယ်
+        import subprocess
+        aid = subprocess.check_output("settings get secure android_id", shell=True).decode().strip()
+    except:
+        # ဒုတိယနည်းလမ်း- အပေါ်ကမရရင် Termux user ID ကို ယူမယ်
+        aid = os.popen("whoami").read().strip() + "-001"
+    
+    unique_id = "TRB-" + hashlib.md5(aid.encode()).hexdigest()[:12].upper()
     return unique_id
+    
 
 def encrypt_data(data):
     return base64.b64encode(data.encode()).decode()
