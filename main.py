@@ -9,7 +9,7 @@ except ImportError:
     sys.exit(1)
 
 # Configuration (သင့်ရဲ့ GitHub Raw Link ကို ပြင်ရန်)
-DB_URL = "https://raw.githubusercontent.com/heinminthant2022happy-bit/Test/refs/heads/main/database.txt"
+DB_URL = "https://raw.githubusercontent.com/heinminthant2022happy-bit/Test/refs/heads/main/database.txt?v=1"
 LOCAL_DB = ".sys_auth.bin"
 
 def get_device_id():
@@ -35,10 +35,16 @@ def decrypt_data(data):
 
 def check_online():
     try:
-        r = requests.get(DB_URL, timeout=5)
-        return r.text.splitlines() if r.status_code == 200 else None
+        # Cache မကျန်အောင် Header ထည့်ပြီး လှမ်းခေါ်ခြင်း
+        headers = {'Cache-Control': 'no-cache', 'Pragma': 'no-cache'}
+        r = requests.get(DB_URL, headers=headers, timeout=5)
+        if r.status_code == 200:
+            return r.text.splitlines()
+        return None
     except:
         return None
+        
+
 
 def main_auth():
     os.system('clear')
