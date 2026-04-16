@@ -1,2 +1,1 @@
-DeviceID|Key|ExpiredDate(YYYY-MM-DD)
 10277user|test|2026-12-31
